@@ -44,20 +44,19 @@ const computeTradeMetrics = (trade: any, feeRate = 0.0005) => {
 
 const DEFAULT_MOCK_TRADES = [
   { id: '1', date: '2026-03-01', time: '09:35', symbol: 'TSLA', direction: 'LONG', entryPrice: 240, exitPrice: 262, quantity: 25, stopLoss: 235, setup: 'Breakout', mistake: 'None', tvLink: 'https://www.tradingview.com', notes: 'Clean breakout.' },
-  { id: '2', date: '2026-03-02', time: '10:15', symbol: 'NVDA', direction: 'SHORT', entryPrice: 880, exitPrice: 854, quantity: 10, stopLoss: 890, setup: 'Liquidity Sweep', mistake: 'FOMO', tvLink: '', notes: 'Reversal hold.' }
+  { id: '2', date: '2026-03-02', time: '10:15', symbol: 'NVDA', direction: 'SHORT', entryPrice: 880, exitPrice: 854, quantity: 10, stopLoss: 890, setup: 'Liquidity Sweep', mistake: 'FOMO', tvLink: '', notes: 'Reversal hold.' },
+  { id: '3', date: '2026-03-03', time: '11:00', symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 65400, exitPrice: 67800, quantity: 0.8, stopLoss: 64200, setup: 'VWAP Bounce', mistake: 'None', tvLink: '', notes: 'VWAP volume delta spike.' }
 ];
 
 const SETUP_OPTIONS = ['Breakout', 'VWAP Bounce', 'Order Block', 'Liquidity Sweep', 'Trend Continuation', 'Reversal', 'Range Play'];
+const MISTAKE_OPTIONS = ['None', 'FOMO', 'Revenge Trading', 'Overleveraging', 'Early Exit', 'Moved Stop Loss', 'No Plan', 'Chasing'];
 
 export default function TradeZellaPro() {
   const [startingCapital, setStartingCapital] = useState(25000);
   const [feePercentage, setFeePercentage] = useState(0.05);
   const [trades, setTrades] = useState(DEFAULT_MOCK_TRADES);
   
-  const [activeTopTab, setActiveTopTab] = useState('dashboard');
-  const [activeSideTab, setActiveSideTab] = useState('overview');
-  
-  // Modals state
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -76,12 +75,14 @@ export default function TradeZellaPro() {
   // Performance Statistics & Strategy Breakdown
   const stats = useMemo(() => {
     if (!processedTrades.length) {
-      return { totalTrades: 0, netPnl: 0, winRate: 0, totalFees: 0, avgRR: 0, currentCapital: startingCapital, wins: 0, losses: 0, bestSetup: 'N/A' };
+      return { totalTrades: 0, netPnl: 0, winRate: 0, totalFees: 0, avgRR: 0, currentCapital: startingCapital, winsCount: 0, lossesCount: 0, bestSetup: 'N/A' };
     }
     const totalTrades = processedTrades.length;
     const wins = processedTrades.filter(t => t.pnl > 0);
     const losses = processedTrades.filter(t => t.pnl < 0);
-    const winRate = (wins.length / totalTrades) * 100;
+    const winsCount = wins.length;
+    const lossesCount = losses.length;
+    const winRate = totalTrades ? (winsCount / totalTrades) * 100 : 0;
     const netPnl = processedTrades.reduce((sum, t) => sum + t.pnl, 0);
     const currentCapital = startingCapital + netPnl;
     const totalFees = processedTrades.reduce((sum, t) => sum + t.totalFee, 0);
@@ -98,7 +99,7 @@ export default function TradeZellaPro() {
 
     const bestSetup = Object.keys(setupMap).sort((a, b) => setupMap[b].pnl - setupMap[a].pnl)[0] || 'N/A';
 
-    return { totalTrades, netPnl, currentCapital, totalFees, winRate, avgRR, wins: wins.length, losses: losses.length, bestSetup, setupMap };
+    return { totalTrades, netPnl, currentCapital, totalFees, winRate, avgRR, winsCount, lossesCount, bestSetup, setupMap };
   }, [processedTrades, startingCapital]);
 
   const handleSaveTrade = (tradeData: any) => {
@@ -111,34 +112,25 @@ export default function TradeZellaPro() {
     setSelectedTrade(null);
   };
 
+  // Cumulative data for Modern SVG Line Visualizer
+  const cumulativeData = useMemo(() => {
+    let running = startingCapital;
+    return processedTrades.map(t => {
+      running += t.pnl;
+      return running;
+    });
+  }, [processedTrades, startingCapital]);
+
   return (
     <div className="flex flex-col h-screen bg-[#070312] text-purple-100 overflow-hidden font-sans">
       
-      {/* TOP NAVIGATION BAR */}
-      <header className="h-16 bg-[#0c051a] border-b border-purple-900/40 px-4 lg:px-6 flex items-center justify-between z-30 shrink-0 shadow-2xl">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTopTab('dashboard')}>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-fuchsia-500 to-cyan-400 flex items-center justify-center purple-glow">
-              <span className="font-black text-slate-950 font-mono text-sm">TZ</span>
-            </div>
-            <span className="font-extrabold text-white tracking-wider font-mono text-sm hidden sm:inline">TRADEZELLA</span>
+      {/* CLEAN TOP NAVBAR */}
+      <header className="h-16 bg-[#0c051a] border-b border-purple-900/40 px-6 flex items-center justify-between z-30 shrink-0 shadow-2xl">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-fuchsia-500 to-cyan-400 flex items-center justify-center purple-glow">
+            <span className="font-black text-slate-950 font-mono text-sm">TZ</span>
           </div>
-
-          <nav className="hidden md:flex items-center gap-1 bg-[#070312] p-1 rounded-xl border border-purple-900/40 text-xs font-mono">
-            {['dashboard', 'journal', 'calculator', 'analytics', 'strategies'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => { setActiveTopTab(tab); setActiveSideTab('overview'); }}
-                className={`px-4 py-1.5 rounded-lg font-semibold transition-all capitalize ${
-                  activeTopTab === tab
-                    ? 'bg-gradient-to-r from-purple-600/40 to-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-500/30 purple-glow'
-                    : 'text-purple-300/70 hover:text-white'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </nav>
+          <span className="font-extrabold text-white tracking-wider font-mono text-sm">TRADEZELLA <span className="text-[10px] bg-fuchsia-500/20 text-fuchsia-300 px-1.5 py-0.5 rounded border border-fuchsia-500/30">PRO</span></span>
         </div>
 
         <div className="flex items-center gap-3 font-mono">
@@ -148,7 +140,6 @@ export default function TradeZellaPro() {
           >
             <span>+ Log Trade</span>
           </button>
-          
           <button
             onClick={() => setIsAuthModalOpen(true)}
             className="flex items-center gap-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/50 px-3 py-2 rounded-xl text-xs text-purple-200 transition-all"
@@ -162,22 +153,23 @@ export default function TradeZellaPro() {
       {/* BODY LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
         
-        {/* SECONDARY SIDEBAR */}
-        <aside className="w-56 bg-[#0a0416]/80 border-r border-purple-900/30 hidden lg:flex flex-col p-4 shrink-0 font-mono">
-          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest px-3 mb-2">Analytics Tools</span>
+        {/* COMPREHENSIVE LEFT SIDEBAR NAVIGATION & TOOLS */}
+        <aside className="w-64 bg-[#0a0416]/90 border-r border-purple-900/40 flex flex-col p-4 shrink-0 font-mono overflow-y-auto space-y-4">
+          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest px-2">Navigation</span>
           <div className="space-y-1">
             {[
-              { id: 'overview', label: 'Overview', icon: '📊', tab: 'dashboard' },
-              { id: 'calendar', label: 'Calendar', icon: '📅', tab: 'dashboard' },
-              { id: 'strategies', label: 'Strategies', icon: '📈', tab: 'strategies' },
-              { id: 'calculator', label: 'Position Sizer', icon: '🧮', tab: 'calculator' }
+              { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+              { id: 'journal', label: 'Trades Journal', icon: '📖' },
+              { id: 'strategies', label: 'Strategies & Setups', icon: '🎯' },
+              { id: 'calculator', label: 'Position Sizer', icon: '🧮' },
+              { id: 'calendar', label: 'Calendar', icon: '📅' }
             ].map(item => (
               <button
                 key={item.id}
-                onClick={() => { setActiveSideTab(item.id); setActiveTopTab(item.tab); }}
+                onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeSideTab === item.id
-                    ? 'bg-purple-600/20 text-fuchsia-300 border border-fuchsia-500/30'
+                  activeTab === item.id
+                    ? 'bg-gradient-to-r from-purple-600/30 to-fuchsia-600/20 text-fuchsia-300 border border-fuchsia-500/40 purple-glow'
                     : 'text-purple-300/70 hover:text-white hover:bg-purple-900/20'
                 }`}
               >
@@ -187,8 +179,9 @@ export default function TradeZellaPro() {
             ))}
           </div>
 
-          {/* CAPITAL & FEE CONTROLS */}
-          <div className="mt-auto bg-[#080314] p-3.5 rounded-2xl border border-purple-900/40 space-y-3">
+          {/* CAPITAL & FEE CONTROLS WIDGET */}
+          <div className="bg-[#080314] p-4 rounded-2xl border border-purple-900/40 space-y-3">
+            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Account Settings</span>
             <div>
               <label className="text-[10px] text-purple-400 block mb-1">Starting Capital ($)</label>
               <input
@@ -208,81 +201,84 @@ export default function TradeZellaPro() {
                 className="w-full bg-[#12082b] text-white text-xs p-2 rounded-lg border border-purple-800/60 focus:outline-none focus:border-fuchsia-500 font-mono"
               />
             </div>
-            <div className="pt-2 border-t border-purple-900/40 text-[10px] text-fuchsia-300">
-              1% Risk: <strong>${(stats.currentCapital * 0.01).toFixed(2)}</strong>
+            <div className="pt-2 border-t border-purple-900/40 text-[10px] text-fuchsia-300 flex justify-between">
+              <span>1% Risk:</span> <strong>${(stats.currentCapital * 0.01).toFixed(2)}</strong>
+            </div>
+          </div>
+
+          {/* QUICK POSITION SIZER WIDGET */}
+          <div className="bg-[#080314] p-4 rounded-2xl border border-purple-900/40 space-y-2">
+            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Quick Position Sizer</span>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div><label className="text-purple-400 block">Entry</label><input type="number" value={calcEntry} onChange={e => setCalcEntry(parseFloat(e.target.value)||0)} className="w-full bg-[#12082b] p-1.5 rounded border border-purple-800/60 text-white" /></div>
+              <div><label className="text-purple-400 block">Stop Loss</label><input type="number" value={calcSl} onChange={e => setCalcSl(parseFloat(e.target.value)||0)} className="w-full bg-[#12082b] p-1.5 rounded border border-purple-800/60 text-white" /></div>
+            </div>
+            <div className="pt-2 text-[10px] text-emerald-400 font-bold flex justify-between">
+              <span>Units:</span>
+              <span>{Math.abs(calcEntry - calcSl) > 0 ? ((stats.currentCapital * (calcRiskPct / 100)) / Math.abs(calcEntry - calcSl)).toFixed(2) : 0}</span>
             </div>
           </div>
         </aside>
 
         {/* MAIN VIEW AREA */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* DASHBOARD TAB */}
-          {activeTopTab === 'dashboard' && activeSideTab === 'overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* DASHBOARD VIEW */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
               
-              <div className="lg:col-span-2 space-y-6">
-                
-                {/* PORTFOLIO PERFORMANCE GRAPH */}
-                <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-5 shadow-xl purple-glow">
-                  <div className="flex items-center justify-between mb-4 font-mono">
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Portfolio Performance & Equity Curve</h3>
-                    <span className={`text-xs font-bold ${stats.netPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {stats.netPnl >= 0 ? `+$${stats.netPnl.toFixed(2)}` : `-$${Math.abs(stats.netPnl).toFixed(2)}`}
-                    </span>
-                  </div>
-                  <div className="h-48 flex items-end justify-between gap-3 bg-[#070312] rounded-2xl border border-purple-900/30 p-4 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-purple-600/20 to-transparent"></div>
-                    {processedTrades.map((t, idx) => (
-                      <div key={idx} className="flex-1 bg-gradient-to-t from-fuchsia-600 to-purple-400 rounded-t-lg transition-all hover:opacity-80" style={{ height: `${Math.max(30, Math.min(100, (t.pnl + 200) * 0.6))}%` }}></div>
-                    ))}
+              {/* TOP METRICS & WIN RATE COUNTERS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
+                <div className="bg-[#0e061d]/90 border border-purple-900/40 p-5 rounded-2xl shadow-xl">
+                  <span className="text-xs text-purple-400 uppercase">Account Equity</span>
+                  <div className="text-2xl font-bold text-emerald-400 mt-1">${stats.currentCapital.toFixed(2)}</div>
+                </div>
+                <div className="bg-[#0e061d]/90 border border-purple-900/40 p-5 rounded-2xl shadow-xl">
+                  <span className="text-xs text-purple-400 uppercase">Win / Loss Ratio</span>
+                  <div className="text-2xl font-bold text-white mt-1 flex items-center gap-2">
+                    <span className="text-emerald-400">{stats.winsCount}W</span> / <span className="text-rose-400">{stats.lossesCount}L</span>
+                    <span className="text-xs text-fuchsia-300 font-normal">({stats.winRate.toFixed(0)}%)</span>
                   </div>
                 </div>
-
-                {/* KEY METRICS */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono">
-                  <div className="bg-[#0e061d]/90 border border-purple-900/40 p-4 rounded-2xl">
-                    <span className="text-[10px] text-purple-400 uppercase">Account Equity</span>
-                    <div className="text-lg font-bold text-emerald-400 mt-1">${stats.currentCapital.toFixed(2)}</div>
-                  </div>
-                  <div className="bg-[#0e061d]/90 border border-purple-900/40 p-4 rounded-2xl">
-                    <span className="text-[10px] text-purple-400 uppercase">Win Rate</span>
-                    <div className="text-lg font-bold text-white mt-1">{stats.winRate.toFixed(1)}%</div>
-                  </div>
-                  <div className="bg-[#0e061d]/90 border border-purple-900/40 p-4 rounded-2xl">
-                    <span className="text-[10px] text-purple-400 uppercase">Total Trades</span>
-                    <div className="text-lg font-bold text-white mt-1">{stats.totalTrades}</div>
-                  </div>
-                  <div className="bg-[#0e061d]/90 border border-purple-900/40 p-4 rounded-2xl">
-                    <span className="text-[10px] text-purple-400 uppercase">Top Setup</span>
-                    <div className="text-sm font-bold text-fuchsia-300 mt-1 truncate">{stats.bestSetup}</div>
+                <div className="bg-[#0e061d]/90 border border-purple-900/40 p-5 rounded-2xl shadow-xl">
+                  <span className="text-xs text-purple-400 uppercase">Net Profit (P&L)</span>
+                  <div className={`text-2xl font-bold mt-1 ${stats.netPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    ${stats.netPnl.toFixed(2)}
                   </div>
                 </div>
-
+                <div className="bg-[#0e061d]/90 border border-purple-900/40 p-5 rounded-2xl shadow-xl">
+                  <span className="text-xs text-purple-400 uppercase">Total Commissions</span>
+                  <div className="text-2xl font-bold text-amber-400 mt-1">${stats.totalFees.toFixed(2)}</div>
+                </div>
               </div>
 
-              {/* RIGHT COLUMN: RECENT TRADES */}
-              <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-5 shadow-xl flex flex-col font-mono">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Recent Executions</h3>
-                <div className="space-y-3 flex-1 overflow-y-auto">
-                  {processedTrades.map(trade => (
-                    <div
-                      key={trade.id}
-                      onClick={() => setSelectedTrade(trade)}
-                      className="bg-[#080314] border border-purple-900/40 p-3 rounded-2xl flex items-center justify-between cursor-pointer hover:border-fuchsia-500/50 transition-all text-xs"
-                    >
-                      <div>
-                        <span className="font-bold text-white text-sm">{trade.symbol}</span>
-                        <span className="text-[10px] text-purple-400 block">{trade.date}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className={`font-bold ${trade.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {trade.pnl >= 0 ? `+$${trade.pnl.toFixed(2)}` : `-$${Math.abs(trade.pnl).toFixed(2)}`}
-                        </span>
-                        <span className="text-[10px] text-purple-400 block">{trade.status}</span>
-                      </div>
-                    </div>
-                  ))}
+              {/* MODERN SVG LINE VISUALIZER (EQUITY CURVE) */}
+              <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl purple-glow space-y-4">
+                <div className="flex items-center justify-between font-mono">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">Portfolio Performance & Equity Curve</h3>
+                  <span className="text-xs font-bold text-fuchsia-400">Live Compound Tracker</span>
+                </div>
+                <div className="h-64 w-full bg-[#070312] rounded-2xl border border-purple-900/30 p-4 relative overflow-hidden flex items-center justify-center">
+                  <svg className="w-full h-full overflow-visible" viewBox="0 0 600 200">
+                    <defs>
+                      <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#c084fc" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    {/* Render modern line chart path */}
+                    <path
+                      d={cumulativeData.map((val, idx) => {
+                        const x = (idx / Math.max(cumulativeData.length - 1, 1)) * 560 + 20;
+                        const y = 180 - ((val - startingCapital + 500) / 2000) * 140;
+                        return `${idx === 0 ? 'M' : 'L'} ${x} ${Math.max(20, Math.min(180, y))}`;
+                      }).join(' ')}
+                      fill="none"
+                      stroke="#d8b4fe"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </div>
               </div>
 
@@ -290,7 +286,7 @@ export default function TradeZellaPro() {
           )}
 
           {/* JOURNAL TAB */}
-          {activeTopTab === 'journal' && (
+          {activeTab === 'journal' && (
             <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl overflow-x-auto font-mono">
               <h3 className="text-base font-bold text-white mb-4">Complete Trades Journal</h3>
               <table className="w-full text-left text-xs text-purple-200">
@@ -302,7 +298,7 @@ export default function TradeZellaPro() {
                     <th className="py-3 px-3">Entry / Exit</th>
                     <th className="py-3 px-3 text-right">Fee</th>
                     <th className="py-3 px-3 text-right">Net P&L</th>
-                    <th className="py-3 px-3 text-center">TV Link</th>
+                    <th className="py-3 px-3 text-center">Chart</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-purple-900/20">
@@ -324,10 +320,25 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* POSITION SIZER / CALCULATOR TAB */}
-          {(activeTopTab === 'calculator' || activeSideTab === 'calculator') && (
+          {/* STRATEGIES TAB */}
+          {activeTab === 'strategies' && (
+            <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl font-mono space-y-4">
+              <h3 className="text-base font-bold text-white mb-4">Strategy & Setup Breakdown</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Object.entries(stats.setupMap || {}).map(([setup, data]: any) => (
+                  <div key={setup} className="bg-[#070312] border border-purple-900/40 p-4 rounded-2xl space-y-2">
+                    <div className="flex justify-between font-bold"><span className="text-white">{setup}</span><span className={data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>${data.pnl.toFixed(2)}</span></div>
+                    <div className="text-xs text-purple-400 flex justify-between"><span>Trades: {data.count}</span><span>Win Rate: {((data.wins / data.count) * 100).toFixed(0)}%</span></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* POSITION SIZER TAB */}
+          {activeTab === 'calculator' && (
             <div className="max-w-xl mx-auto bg-[#0e061d] border border-purple-900/40 p-6 rounded-3xl shadow-xl font-mono space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase border-b border-purple-900/40 pb-3">Position Size Calculator</h3>
+              <h3 className="text-sm font-bold text-white uppercase border-b border-purple-900/40 pb-3">Advanced Position Size Calculator</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="text-[10px] text-purple-400 block mb-1">Symbol</label><input value={calcSymbol} onChange={e => setCalcSymbol(e.target.value)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
                 <div><label className="text-[10px] text-purple-400 block mb-1">Risk %</label><input type="number" value={calcRiskPct} onChange={e => setCalcRiskPct(parseFloat(e.target.value) || 1)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
@@ -341,23 +352,8 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* STRATEGIES TAB */}
-          {(activeTopTab === 'strategies' || activeSideTab === 'strategies') && (
-            <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl font-mono space-y-4">
-              <h3 className="text-base font-bold text-white mb-4">Strategy & Setup Performance</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {Object.entries(stats.setupMap || {}).map(([setup, data]: any) => (
-                  <div key={setup} className="bg-[#070312] border border-purple-900/40 p-4 rounded-2xl space-y-2">
-                    <div className="flex justify-between font-bold"><span className="text-white">{setup}</span><span className={data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>${data.pnl.toFixed(2)}</span></div>
-                    <div className="text-xs text-purple-400 flex justify-between"><span>Trades: {data.count}</span><span>Win Rate: {((data.wins / data.count) * 100).toFixed(0)}%</span></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* CALENDAR VIEW */}
-          {activeSideTab === 'calendar' && (
+          {activeTab === 'calendar' && (
             <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl font-mono">
               <h3 className="text-base font-bold text-white mb-4">Performance Calendar</h3>
               <div className="grid grid-cols-7 gap-2 text-center text-xs text-purple-400">
@@ -375,7 +371,7 @@ export default function TradeZellaPro() {
         </main>
       </div>
 
-      {/* AUTH MODAL (SIGN IN / SIGN UP) */}
+      {/* AUTH MODAL */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-[#110726] border border-purple-800/60 rounded-3xl w-full max-w-sm p-6 space-y-4 font-mono text-xs shadow-2xl purple-glow">
