@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 
 // Centralized Trade Metric Calculator with Custom Fees
 const computeTradeMetrics = (trade: any, feeRate = 0.0005) => {
@@ -78,7 +78,15 @@ export default function TradingJournalSaaS() {
     const newTrade = {
       id: `trd-${Date.now()}`,
       date: new Date().toISOString().slice(0, 10),
-      ...form
+      symbol: form.symbol,
+      direction: form.direction,
+      entryPrice: parseFloat(form.entryPrice) || 0,
+      exitPrice: parseFloat(form.exitPrice) || 0,
+      quantity: parseFloat(form.quantity) || 0,
+      stopLoss: parseFloat(form.stopLoss) || 0,
+      setup: form.setup,
+      tvLink: form.tvLink,
+      notes: form.notes
     };
     setTrades([newTrade, ...trades]);
     setIsModalOpen(false);
@@ -107,20 +115,17 @@ export default function TradingJournalSaaS() {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg transition-all purple-glow flex items-center gap-1.5"
+            className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg transition-all flex items-center gap-1.5"
           >
             <span>+ Log Trade</span>
           </button>
-          <div className="text-xs font-mono bg-purple-950 px-3 py-1.5 rounded-xl border border-purple-800/50 text-purple-300 hidden sm:block">
-            Pro Subscriber
-          </div>
         </div>
       </header>
 
       {/* Main Dashboard Layout */}
       <main className="p-6 max-w-7xl mx-auto space-y-6">
         
-        {/* Settings Bar (Capital & Fee Controls) */}
+        {/* Settings Bar */}
         <div className="bg-[#0e061d] border border-purple-900/40 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4 font-mono text-xs">
             <div>
@@ -218,7 +223,7 @@ export default function TradingJournalSaaS() {
       {/* Log Trade Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-[#110726] border border-purple-800/60 rounded-3xl w-full max-w-md p-6 space-y-4 font-mono text-xs shadow-2xl purple-glow">
+          <div className="bg-[#110726] border border-purple-800/60 rounded-3xl w-full max-w-md p-6 space-y-4 font-mono text-xs shadow-2xl">
             <div className="flex justify-between items-center border-b border-purple-900/60 pb-3">
               <h3 className="font-bold text-white text-sm">LOG NEW TRADE</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-purple-400 hover:text-white">✕</button>
