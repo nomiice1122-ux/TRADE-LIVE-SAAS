@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 
 // CENTRALIZED TRADE METRIC CALCULATOR
 const computeTradeMetrics = (trade: any, feeRate = 0.0005) => {
@@ -48,7 +48,6 @@ const DEFAULT_MOCK_TRADES = [
 ];
 
 const SETUP_OPTIONS = ['Breakout', 'VWAP Bounce', 'Order Block', 'Liquidity Sweep', 'Trend Continuation', 'Reversal', 'Range Play'];
-const MISTAKE_OPTIONS = ['None', 'FOMO', 'Revenge Trading', 'Overleveraging', 'Early Exit', 'Moved Stop Loss', 'No Plan', 'Chasing'];
 
 export default function TradeZellaPro() {
   const [startingCapital, setStartingCapital] = useState(25000);
@@ -57,13 +56,24 @@ export default function TradeZellaPro() {
   
   const [activeTopTab, setActiveTopTab] = useState('dashboard');
   const [activeSideTab, setActiveSideTab] = useState('overview');
+  
+  // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [currentUser, setCurrentUser] = useState<string | null>('trader@tradezella.pro');
   const [selectedTrade, setSelectedTrade] = useState<any>(null);
+
+  // Position Sizer calculator state
+  const [calcSymbol, setCalcSymbol] = useState('TSLA');
+  const [calcRiskPct, setCalcRiskPct] = useState(1);
+  const [calcEntry, setCalcEntry] = useState(250);
+  const [calcSl, setCalcSl] = useState(245);
 
   const feeRateDecimal = feePercentage / 100;
   const processedTrades = useMemo(() => trades.map(t => computeTradeMetrics(t, feeRateDecimal)), [trades, feeRateDecimal]);
 
-  // Performance Statistics
+  // Performance Statistics & Strategy Breakdown
   const stats = useMemo(() => {
     if (!processedTrades.length) {
       return { totalTrades: 0, netPnl: 0, winRate: 0, totalFees: 0, avgRR: 0, currentCapital: startingCapital, wins: 0, losses: 0, bestSetup: 'N/A' };
@@ -79,10 +89,16 @@ export default function TradeZellaPro() {
     const avgRR = validR.length ? validR.reduce((sum, t) => sum + t.rMultiple, 0) / validR.length : 0;
 
     const setupMap: any = {};
-    processedTrades.forEach(t => { setupMap[t.setup] = (setupMap[t.setup] || 0) + t.pnl; });
-    const bestSetup = Object.keys(setupMap).sort((a, b) => setupMap[b] - setupMap[a])[0] || 'N/A';
+    processedTrades.forEach(t => {
+      if (!setupMap[t.setup]) setupMap[t.setup] = { count: 0, wins: 0, pnl: 0 };
+      setupMap[t.setup].count += 1;
+      setupMap[t.setup].pnl += t.pnl;
+      if (t.pnl > 0) setupMap[t.setup].wins += 1;
+    });
 
-    return { totalTrades, netPnl, currentCapital, totalFees, winRate, avgRR, wins: wins.length, losses: losses.length, bestSetup };
+    const bestSetup = Object.keys(setupMap).sort((a, b) => setupMap[b].pnl - setupMap[a].pnl)[0] || 'N/A';
+
+    return { totalTrades, netPnl, currentCapital, totalFees, winRate, avgRR, wins: wins.length, losses: losses.length, bestSetup, setupMap };
   }, [processedTrades, startingCapital]);
 
   const handleSaveTrade = (tradeData: any) => {
@@ -98,10 +114,10 @@ export default function TradeZellaPro() {
   return (
     <div className="flex flex-col h-screen bg-[#070312] text-purple-100 overflow-hidden font-sans">
       
-      {/* TOP NAVIGATION BAR (MATCHING SCREENSHOT 2) */}
+      {/* TOP NAVIGATION BAR */}
       <header className="h-16 bg-[#0c051a] border-b border-purple-900/40 px-4 lg:px-6 flex items-center justify-between z-30 shrink-0 shadow-2xl">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTopTab('dashboard')}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-fuchsia-500 to-cyan-400 flex items-center justify-center purple-glow">
               <span className="font-black text-slate-950 font-mono text-sm">TZ</span>
             </div>
@@ -109,10 +125,10 @@ export default function TradeZellaPro() {
           </div>
 
           <nav className="hidden md:flex items-center gap-1 bg-[#070312] p-1 rounded-xl border border-purple-900/40 text-xs font-mono">
-            {['dashboard', 'journal', 'calculator', 'analytics', 'community'].map(tab => (
+            {['dashboard', 'journal', 'calculator', 'analytics', 'strategies'].map(tab => (
               <button
                 key={tab}
-                onClick={() => setActiveTopTab(tab)}
+                onClick={() => { setActiveTopTab(tab); setActiveSideTab('overview'); }}
                 className={`px-4 py-1.5 rounded-lg font-semibold transition-all capitalize ${
                   activeTopTab === tab
                     ? 'bg-gradient-to-r from-purple-600/40 to-fuchsia-600/30 text-fuchsia-300 border border-fuchsia-500/30 purple-glow'
@@ -125,35 +141,40 @@ export default function TradeZellaPro() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 font-mono">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl purple-glow transition-all flex items-center gap-1.5 font-mono"
+            className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl purple-glow transition-all flex items-center gap-1.5"
           >
             <span>+ Log Trade</span>
           </button>
-          <div className="w-9 h-9 rounded-full bg-purple-900/50 border border-purple-700/50 flex items-center justify-center text-purple-200">
-            <span>[U]</span>
-          </div>
+          
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            className="flex items-center gap-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/50 px-3 py-2 rounded-xl text-xs text-purple-200 transition-all"
+          >
+            <span>👤</span>
+            <span className="hidden sm:inline">{currentUser ? currentUser.split('@')[0] : 'Sign In'}</span>
+          </button>
         </div>
       </header>
 
       {/* BODY LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
         
-        {/* SECONDARY SIDEBAR (ANALYTICS TOOLS) */}
+        {/* SECONDARY SIDEBAR */}
         <aside className="w-56 bg-[#0a0416]/80 border-r border-purple-900/30 hidden lg:flex flex-col p-4 shrink-0 font-mono">
           <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest px-3 mb-2">Analytics Tools</span>
           <div className="space-y-1">
             {[
-              { id: 'overview', label: 'Overview', icon: '📊' },
-              { id: 'calendar', label: 'Calendar', icon: '📅' },
-              { id: 'strategies', label: 'Strategies', icon: '📈' },
-              { id: 'calculator', label: 'Position Sizer', icon: '🧮' }
+              { id: 'overview', label: 'Overview', icon: '📊', tab: 'dashboard' },
+              { id: 'calendar', label: 'Calendar', icon: '📅', tab: 'dashboard' },
+              { id: 'strategies', label: 'Strategies', icon: '📈', tab: 'strategies' },
+              { id: 'calculator', label: 'Position Sizer', icon: '🧮', tab: 'calculator' }
             ].map(item => (
               <button
                 key={item.id}
-                onClick={() => setActiveSideTab(item.id)}
+                onClick={() => { setActiveSideTab(item.id); setActiveTopTab(item.tab); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   activeSideTab === item.id
                     ? 'bg-purple-600/20 text-fuchsia-300 border border-fuchsia-500/30'
@@ -166,7 +187,7 @@ export default function TradeZellaPro() {
             ))}
           </div>
 
-          {/* CAPITAL & FEE CONTROLS WIDGET */}
+          {/* CAPITAL & FEE CONTROLS */}
           <div className="mt-auto bg-[#080314] p-3.5 rounded-2xl border border-purple-900/40 space-y-3">
             <div>
               <label className="text-[10px] text-purple-400 block mb-1">Starting Capital ($)</label>
@@ -200,7 +221,6 @@ export default function TradeZellaPro() {
           {activeTopTab === 'dashboard' && activeSideTab === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* LEFT 2 COLUMNS */}
               <div className="lg:col-span-2 space-y-6">
                 
                 {/* PORTFOLIO PERFORMANCE GRAPH */}
@@ -304,14 +324,34 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* POSITION SIZER TAB */}
-          {activeTopTab === 'calculator' && (
+          {/* POSITION SIZER / CALCULATOR TAB */}
+          {(activeTopTab === 'calculator' || activeSideTab === 'calculator') && (
             <div className="max-w-xl mx-auto bg-[#0e061d] border border-purple-900/40 p-6 rounded-3xl shadow-xl font-mono space-y-4">
               <h3 className="text-sm font-bold text-white uppercase border-b border-purple-900/40 pb-3">Position Size Calculator</h3>
-              <p className="text-xs text-purple-400">Calculate exact unit size based on your 1% risk rule.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-[10px] text-purple-400 block mb-1">Symbol</label><input value={calcSymbol} onChange={e => setCalcSymbol(e.target.value)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
+                <div><label className="text-[10px] text-purple-400 block mb-1">Risk %</label><input type="number" value={calcRiskPct} onChange={e => setCalcRiskPct(parseFloat(e.target.value) || 1)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
+                <div><label className="text-[10px] text-purple-400 block mb-1">Entry Price ($)</label><input type="number" value={calcEntry} onChange={e => setCalcEntry(parseFloat(e.target.value) || 0)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
+                <div><label className="text-[10px] text-purple-400 block mb-1">Stop Loss ($)</label><input type="number" value={calcSl} onChange={e => setCalcSl(parseFloat(e.target.value) || 0)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
+              </div>
               <div className="p-4 bg-[#070312] rounded-2xl border border-purple-900/40 space-y-2 text-xs">
-                <div className="flex justify-between"><span>Account Equity:</span> <strong className="text-emerald-400">${stats.currentCapital.toFixed(2)}</strong></div>
-                <div className="flex justify-between"><span>1% Risk Amount:</span> <strong className="text-fuchsia-300">${(stats.currentCapital * 0.01).toFixed(2)}</strong></div>
+                <div className="flex justify-between"><span>Cash at Risk:</span> <strong className="text-amber-400">${(stats.currentCapital * (calcRiskPct / 100)).toFixed(2)}</strong></div>
+                <div className="flex justify-between"><span>Required Units:</span> <strong className="text-emerald-400">{Math.abs(calcEntry - calcSl) > 0 ? ((stats.currentCapital * (calcRiskPct / 100)) / Math.abs(calcEntry - calcSl)).toFixed(2) : 0}</strong></div>
+              </div>
+            </div>
+          )}
+
+          {/* STRATEGIES TAB */}
+          {(activeTopTab === 'strategies' || activeSideTab === 'strategies') && (
+            <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl font-mono space-y-4">
+              <h3 className="text-base font-bold text-white mb-4">Strategy & Setup Performance</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Object.entries(stats.setupMap || {}).map(([setup, data]: any) => (
+                  <div key={setup} className="bg-[#070312] border border-purple-900/40 p-4 rounded-2xl space-y-2">
+                    <div className="flex justify-between font-bold"><span className="text-white">{setup}</span><span className={data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>${data.pnl.toFixed(2)}</span></div>
+                    <div className="text-xs text-purple-400 flex justify-between"><span>Trades: {data.count}</span><span>Win Rate: {((data.wins / data.count) * 100).toFixed(0)}%</span></div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -334,6 +374,31 @@ export default function TradeZellaPro() {
 
         </main>
       </div>
+
+      {/* AUTH MODAL (SIGN IN / SIGN UP) */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-[#110726] border border-purple-800/60 rounded-3xl w-full max-w-sm p-6 space-y-4 font-mono text-xs shadow-2xl purple-glow">
+            <div className="flex justify-between items-center border-b border-purple-900/60 pb-3">
+              <h3 className="font-bold text-white text-sm">{authMode === 'login' ? 'SIGN IN TO TRADEZELLA' : 'CREATE ACCOUNT'}</h3>
+              <button onClick={() => setIsAuthModalOpen(false)} className="text-purple-400 hover:text-white">✕</button>
+            </div>
+            <form onSubmit={(e: any) => {
+              e.preventDefault();
+              const fd = new FormData(e.target);
+              setCurrentUser(fd.get('email')?.toString() || 'trader@tradezella.pro');
+              setIsAuthModalOpen(false);
+            }} className="space-y-3">
+              <div><label className="text-purple-300 block mb-1">Email Address</label><input name="email" type="email" defaultValue={currentUser || ''} className="w-full bg-[#080314] text-white p-2.5 rounded-xl border border-purple-800/60 text-xs" required /></div>
+              <div><label className="text-purple-300 block mb-1">Password</label><input name="password" type="password" defaultValue="********" className="w-full bg-[#080314] text-white p-2.5 rounded-xl border border-purple-800/60 text-xs" required /></div>
+              <div className="flex justify-between items-center pt-2">
+                <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="text-fuchsia-400 text-[10px] underline">{authMode === 'login' ? 'Need an account? Sign up' : 'Existing user? Sign in'}</button>
+                <button type="submit" className="px-4 py-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl shadow-lg">{authMode === 'login' ? 'Sign In' : 'Sign Up'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* LOG TRADE MODAL */}
       {isAddModalOpen && (
