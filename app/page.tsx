@@ -44,26 +44,21 @@ const computeTradeMetrics = (trade: any, feeRate = 0.0005) => {
 
 const DEFAULT_MOCK_TRADES = [
   { id: '1', date: '2026-03-01', time: '09:35', symbol: 'TSLA', direction: 'LONG', entryPrice: 240, exitPrice: 262, quantity: 25, stopLoss: 235, setup: 'Breakout', mistake: 'None', tvLink: 'https://www.tradingview.com', notes: 'Clean breakout.' },
-  { id: '2', date: '2026-03-02', time: '10:15', symbol: 'NVDA', direction: 'SHORT', entryPrice: 880, exitPrice: 854, quantity: 10, stopLoss: 890, setup: 'Liquidity Sweep', mistake: 'FOMO', tvLink: '', notes: 'Reversal hold.' },
-  { id: '3', date: '2026-03-03', time: '11:00', symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 65400, exitPrice: 67800, quantity: 0.8, stopLoss: 64200, setup: 'VWAP Bounce', mistake: 'None', tvLink: '', notes: 'VWAP volume delta spike.' }
+  { id: '2', date: '2026-03-02', time: '10:15', symbol: 'NVDA', direction: 'SHORT', entryPrice: 880, exitPrice: 854, quantity: 10, stopLoss: 890, setup: 'Liquidity Sweep', mistake: 'FOMO', tvLink: '', notes: 'Reversal hold.' }
 ];
 
 const SETUP_OPTIONS = ['Breakout', 'VWAP Bounce', 'Order Block', 'Liquidity Sweep', 'Trend Continuation', 'Reversal', 'Range Play'];
-const MISTAKE_OPTIONS = ['None', 'FOMO', 'Revenge Trading', 'Overleveraging', 'Early Exit', 'Moved Stop Loss', 'No Plan', 'Chasing'];
 
-export default function TradeZellaPro() {
+export default function TradesDailyApp() {
   const [startingCapital, setStartingCapital] = useState(25000);
   const [feePercentage, setFeePercentage] = useState(0.05);
   const [trades, setTrades] = useState(DEFAULT_MOCK_TRADES);
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [currentUser, setCurrentUser] = useState<string | null>('trader@tradezella.pro');
   const [selectedTrade, setSelectedTrade] = useState<any>(null);
 
-  // Position Sizer calculator state
+  // Position Sizer state
   const [calcSymbol, setCalcSymbol] = useState('TSLA');
   const [calcRiskPct, setCalcRiskPct] = useState(1);
   const [calcEntry, setCalcEntry] = useState(250);
@@ -72,10 +67,9 @@ export default function TradeZellaPro() {
   const feeRateDecimal = feePercentage / 100;
   const processedTrades = useMemo(() => trades.map(t => computeTradeMetrics(t, feeRateDecimal)), [trades, feeRateDecimal]);
 
-  // Performance Statistics & Strategy Breakdown
   const stats = useMemo(() => {
     if (!processedTrades.length) {
-      return { totalTrades: 0, netPnl: 0, winRate: 0, totalFees: 0, avgRR: 0, currentCapital: startingCapital, winsCount: 0, lossesCount: 0, bestSetup: 'N/A' };
+      return { totalTrades: 0, netPnl: 0, winRate: 0, totalFees: 0, currentCapital: startingCapital, winsCount: 0, lossesCount: 0, bestSetup: 'N/A' };
     }
     const totalTrades = processedTrades.length;
     const wins = processedTrades.filter(t => t.pnl > 0);
@@ -86,8 +80,6 @@ export default function TradeZellaPro() {
     const netPnl = processedTrades.reduce((sum, t) => sum + t.pnl, 0);
     const currentCapital = startingCapital + netPnl;
     const totalFees = processedTrades.reduce((sum, t) => sum + t.totalFee, 0);
-    const validR = processedTrades.filter(t => t.rMultiple && !isNaN(t.rMultiple));
-    const avgRR = validR.length ? validR.reduce((sum, t) => sum + t.rMultiple, 0) / validR.length : 0;
 
     const setupMap: any = {};
     processedTrades.forEach(t => {
@@ -99,7 +91,7 @@ export default function TradeZellaPro() {
 
     const bestSetup = Object.keys(setupMap).sort((a, b) => setupMap[b].pnl - setupMap[a].pnl)[0] || 'N/A';
 
-    return { totalTrades, netPnl, currentCapital, totalFees, winRate, avgRR, winsCount, lossesCount, bestSetup, setupMap };
+    return { totalTrades, netPnl, currentCapital, totalFees, winRate, winsCount, lossesCount, bestSetup, setupMap };
   }, [processedTrades, startingCapital]);
 
   const handleSaveTrade = (tradeData: any) => {
@@ -112,7 +104,6 @@ export default function TradeZellaPro() {
     setSelectedTrade(null);
   };
 
-  // Cumulative data for Modern SVG Line Visualizer
   const cumulativeData = useMemo(() => {
     let running = startingCapital;
     return processedTrades.map(t => {
@@ -122,112 +113,94 @@ export default function TradeZellaPro() {
   }, [processedTrades, startingCapital]);
 
   return (
-    <div className="flex flex-col h-screen bg-[#070312] text-purple-100 overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#070312] text-purple-100 font-sans overflow-hidden">
       
-      {/* CLEAN TOP NAVBAR */}
-      <header className="h-16 bg-[#0c051a] border-b border-purple-900/40 px-6 flex items-center justify-between z-30 shrink-0 shadow-2xl">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+      {/* LEFT SIDEBAR (EXACT TRADESDAILY STYLE) */}
+      <aside className="w-64 bg-[#0a0416] border-r border-purple-900/40 flex flex-col p-5 shrink-0 font-mono space-y-6">
+        <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-fuchsia-500 to-cyan-400 flex items-center justify-center purple-glow">
-            <span className="font-black text-slate-950 font-mono text-sm">TZ</span>
+            <span className="font-black text-slate-950 text-sm">TD</span>
           </div>
-          <span className="font-extrabold text-white tracking-wider font-mono text-sm">TRADEZELLA <span className="text-[10px] bg-fuchsia-500/20 text-fuchsia-300 px-1.5 py-0.5 rounded border border-fuchsia-500/30">PRO</span></span>
+          <div>
+            <h1 className="font-bold text-sm tracking-wide text-white">TRADES DAILY</h1>
+            <p className="text-[10px] text-purple-400">Professional Journal</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 font-mono">
+        <nav className="space-y-1.5">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+            { id: 'journal', label: 'Trades Journal', icon: '📖' },
+            { id: 'strategies', label: 'Strategies', icon: '🎯' },
+            { id: 'calculator', label: 'Position Sizer', icon: '🧮' },
+            { id: 'calendar', label: 'Calendar', icon: '📅' }
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === item.id
+                  ? 'bg-gradient-to-r from-purple-600/30 to-fuchsia-600/20 text-fuchsia-300 border border-fuchsia-500/40 purple-glow'
+                  : 'text-purple-300/70 hover:text-white hover:bg-purple-900/20'
+              }`}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* CAPITAL & FEE SETTINGS */}
+        <div className="mt-auto bg-[#080314] p-4 rounded-2xl border border-purple-900/40 space-y-3">
+          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Account Settings</span>
+          <div>
+            <label className="text-[10px] text-purple-400 block mb-1">Capital ($)</label>
+            <input
+              type="number"
+              value={startingCapital}
+              onChange={(e) => setStartingCapital(parseFloat(e.target.value) || 0)}
+              className="w-full bg-[#12082b] text-white text-xs p-2 rounded-lg border border-purple-800/60 font-mono focus:outline-none focus:border-fuchsia-500"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-purple-400 block mb-1">Fee Rate (%)</label>
+            <input
+              type="number"
+              step="0.001"
+              value={feePercentage}
+              onChange={(e) => setFeePercentage(parseFloat(e.target.value) || 0)}
+              className="w-full bg-[#12082b] text-white text-xs p-2 rounded-lg border border-purple-800/60 font-mono focus:outline-none focus:border-fuchsia-500"
+            />
+          </div>
+          <div className="pt-2 border-t border-purple-900/40 text-[10px] text-fuchsia-300 flex justify-between">
+            <span>1% Risk:</span> <strong>${(stats.currentCapital * 0.01).toFixed(2)}</strong>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        
+        {/* TOP HEADER */}
+        <header className="h-16 bg-[#0c051a] border-b border-purple-900/40 px-6 flex items-center justify-between z-20 shrink-0">
+          <div className="font-mono text-xs text-purple-300">
+            Welcome back, <strong className="text-white">Trader</strong>
+          </div>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl purple-glow transition-all flex items-center gap-1.5"
+            className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-bold text-xs px-4 py-2 rounded-xl purple-glow transition-all flex items-center gap-1.5 font-mono"
           >
-            <span>+ Log Trade</span>
+            <span>+ Log New Trade</span>
           </button>
-          <button
-            onClick={() => setIsAuthModalOpen(true)}
-            className="flex items-center gap-2 bg-purple-900/40 hover:bg-purple-900/70 border border-purple-700/50 px-3 py-2 rounded-xl text-xs text-purple-200 transition-all"
-          >
-            <span>👤</span>
-            <span className="hidden sm:inline">{currentUser ? currentUser.split('@')[0] : 'Sign In'}</span>
-          </button>
-        </div>
-      </header>
+        </header>
 
-      {/* BODY LAYOUT */}
-      <div className="flex flex-1 overflow-hidden">
-        
-        {/* COMPREHENSIVE LEFT SIDEBAR NAVIGATION & TOOLS */}
-        <aside className="w-64 bg-[#0a0416]/90 border-r border-purple-900/40 flex flex-col p-4 shrink-0 font-mono overflow-y-auto space-y-4">
-          <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest px-2">Navigation</span>
-          <div className="space-y-1">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-              { id: 'journal', label: 'Trades Journal', icon: '📖' },
-              { id: 'strategies', label: 'Strategies & Setups', icon: '🎯' },
-              { id: 'calculator', label: 'Position Sizer', icon: '🧮' },
-              { id: 'calendar', label: 'Calendar', icon: '📅' }
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === item.id
-                    ? 'bg-gradient-to-r from-purple-600/30 to-fuchsia-600/20 text-fuchsia-300 border border-fuchsia-500/40 purple-glow'
-                    : 'text-purple-300/70 hover:text-white hover:bg-purple-900/20'
-                }`}
-              >
-                <span>{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {/* CAPITAL & FEE CONTROLS WIDGET */}
-          <div className="bg-[#080314] p-4 rounded-2xl border border-purple-900/40 space-y-3">
-            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Account Settings</span>
-            <div>
-              <label className="text-[10px] text-purple-400 block mb-1">Starting Capital ($)</label>
-              <input
-                type="number"
-                value={startingCapital}
-                onChange={(e) => setStartingCapital(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#12082b] text-white text-xs p-2 rounded-lg border border-purple-800/60 focus:outline-none focus:border-fuchsia-500 font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-purple-400 block mb-1">Execution Fee (%)</label>
-              <input
-                type="number"
-                step="0.001"
-                value={feePercentage}
-                onChange={(e) => setFeePercentage(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#12082b] text-white text-xs p-2 rounded-lg border border-purple-800/60 focus:outline-none focus:border-fuchsia-500 font-mono"
-              />
-            </div>
-            <div className="pt-2 border-t border-purple-900/40 text-[10px] text-fuchsia-300 flex justify-between">
-              <span>1% Risk:</span> <strong>${(stats.currentCapital * 0.01).toFixed(2)}</strong>
-            </div>
-          </div>
-
-          {/* QUICK POSITION SIZER WIDGET */}
-          <div className="bg-[#080314] p-4 rounded-2xl border border-purple-900/40 space-y-2">
-            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Quick Position Sizer</span>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div><label className="text-purple-400 block">Entry</label><input type="number" value={calcEntry} onChange={e => setCalcEntry(parseFloat(e.target.value)||0)} className="w-full bg-[#12082b] p-1.5 rounded border border-purple-800/60 text-white" /></div>
-              <div><label className="text-purple-400 block">Stop Loss</label><input type="number" value={calcSl} onChange={e => setCalcSl(parseFloat(e.target.value)||0)} className="w-full bg-[#12082b] p-1.5 rounded border border-purple-800/60 text-white" /></div>
-            </div>
-            <div className="pt-2 text-[10px] text-emerald-400 font-bold flex justify-between">
-              <span>Units:</span>
-              <span>{Math.abs(calcEntry - calcSl) > 0 ? ((stats.currentCapital * (calcRiskPct / 100)) / Math.abs(calcEntry - calcSl)).toFixed(2) : 0}</span>
-            </div>
-          </div>
-        </aside>
-
-        {/* MAIN VIEW AREA */}
+        {/* VIEW CONTAINER */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* DASHBOARD VIEW */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               
-              {/* TOP METRICS & WIN RATE COUNTERS */}
+              {/* KEY METRICS GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
                 <div className="bg-[#0e061d]/90 border border-purple-900/40 p-5 rounded-2xl shadow-xl">
                   <span className="text-xs text-purple-400 uppercase">Account Equity</span>
@@ -252,7 +225,7 @@ export default function TradeZellaPro() {
                 </div>
               </div>
 
-              {/* MODERN SVG LINE VISUALIZER (EQUITY CURVE) */}
+              {/* EQUITY CURVE VISUALIZER */}
               <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl purple-glow space-y-4">
                 <div className="flex items-center justify-between font-mono">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">Portfolio Performance & Equity Curve</h3>
@@ -260,13 +233,6 @@ export default function TradeZellaPro() {
                 </div>
                 <div className="h-64 w-full bg-[#070312] rounded-2xl border border-purple-900/30 p-4 relative overflow-hidden flex items-center justify-center">
                   <svg className="w-full h-full overflow-visible" viewBox="0 0 600 200">
-                    <defs>
-                      <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#c084fc" stopOpacity="0.5" />
-                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    {/* Render modern line chart path */}
                     <path
                       d={cumulativeData.map((val, idx) => {
                         const x = (idx / Math.max(cumulativeData.length - 1, 1)) * 560 + 20;
@@ -285,7 +251,6 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* JOURNAL TAB */}
           {activeTab === 'journal' && (
             <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl overflow-x-auto font-mono">
               <h3 className="text-base font-bold text-white mb-4">Complete Trades Journal</h3>
@@ -320,7 +285,6 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* STRATEGIES TAB */}
           {activeTab === 'strategies' && (
             <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl font-mono space-y-4">
               <h3 className="text-base font-bold text-white mb-4">Strategy & Setup Breakdown</h3>
@@ -335,10 +299,9 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* POSITION SIZER TAB */}
           {activeTab === 'calculator' && (
             <div className="max-w-xl mx-auto bg-[#0e061d] border border-purple-900/40 p-6 rounded-3xl shadow-xl font-mono space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase border-b border-purple-900/40 pb-3">Advanced Position Size Calculator</h3>
+              <h3 className="text-sm font-bold text-white uppercase border-b border-purple-900/40 pb-3">Position Size Calculator</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="text-[10px] text-purple-400 block mb-1">Symbol</label><input value={calcSymbol} onChange={e => setCalcSymbol(e.target.value)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
                 <div><label className="text-[10px] text-purple-400 block mb-1">Risk %</label><input type="number" value={calcRiskPct} onChange={e => setCalcRiskPct(parseFloat(e.target.value) || 1)} className="w-full bg-[#070312] text-white p-2 rounded-xl border border-purple-800/60 text-xs" /></div>
@@ -352,7 +315,6 @@ export default function TradeZellaPro() {
             </div>
           )}
 
-          {/* CALENDAR VIEW */}
           {activeTab === 'calendar' && (
             <div className="bg-[#0e061d]/90 border border-purple-900/40 rounded-3xl p-6 shadow-xl font-mono">
               <h3 className="text-base font-bold text-white mb-4">Performance Calendar</h3>
@@ -370,31 +332,6 @@ export default function TradeZellaPro() {
 
         </main>
       </div>
-
-      {/* AUTH MODAL */}
-      {isAuthModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-[#110726] border border-purple-800/60 rounded-3xl w-full max-w-sm p-6 space-y-4 font-mono text-xs shadow-2xl purple-glow">
-            <div className="flex justify-between items-center border-b border-purple-900/60 pb-3">
-              <h3 className="font-bold text-white text-sm">{authMode === 'login' ? 'SIGN IN TO TRADEZELLA' : 'CREATE ACCOUNT'}</h3>
-              <button onClick={() => setIsAuthModalOpen(false)} className="text-purple-400 hover:text-white">✕</button>
-            </div>
-            <form onSubmit={(e: any) => {
-              e.preventDefault();
-              const fd = new FormData(e.target);
-              setCurrentUser(fd.get('email')?.toString() || 'trader@tradezella.pro');
-              setIsAuthModalOpen(false);
-            }} className="space-y-3">
-              <div><label className="text-purple-300 block mb-1">Email Address</label><input name="email" type="email" defaultValue={currentUser || ''} className="w-full bg-[#080314] text-white p-2.5 rounded-xl border border-purple-800/60 text-xs" required /></div>
-              <div><label className="text-purple-300 block mb-1">Password</label><input name="password" type="password" defaultValue="********" className="w-full bg-[#080314] text-white p-2.5 rounded-xl border border-purple-800/60 text-xs" required /></div>
-              <div className="flex justify-between items-center pt-2">
-                <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="text-fuchsia-400 text-[10px] underline">{authMode === 'login' ? 'Need an account? Sign up' : 'Existing user? Sign in'}</button>
-                <button type="submit" className="px-4 py-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl shadow-lg">{authMode === 'login' ? 'Sign In' : 'Sign Up'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* LOG TRADE MODAL */}
       {isAddModalOpen && (
